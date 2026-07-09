@@ -27,14 +27,16 @@ class Attack:
     dangerous: Callable[[AgentResult, Environment, dict], bool]
     minimal_policy: DefensePolicy  # smallest policy that should block it
 
-    def run(self, policy) -> Tuple[AgentResult, Environment, dict]:
+    def run(self, policy, model=None) -> Tuple[AgentResult, Environment, dict]:
         env, ctx, user_message = self.build()
-        agent = Agent(model=MockModel(), env=env, policy=policy)
+        # Default to the deterministic mock; pass a real model (e.g. OllamaModel)
+        # to watch an actual local model face the same scenario.
+        agent = Agent(model=model or MockModel(), env=env, policy=policy)
         result = agent.run(user_message, ctx)
         return result, env, ctx
 
-    def is_pwned(self, policy) -> bool:
-        result, env, ctx = self.run(policy)
+    def is_pwned(self, policy, model=None) -> bool:
+        result, env, ctx = self.run(policy, model=model)
         return self.dangerous(result, env, ctx)
 
 
