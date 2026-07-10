@@ -34,6 +34,8 @@ def test_primary_defense_alone_blocks(attack):
     ), f"{attack.id} primary defense ({attack.primary_defense}) should block it"
 
 
-def test_ladder_has_six_attacks():
-    assert len(ATTACKS) == 6
-    assert IDS == ["A01", "A02", "A03", "A04", "A05", "A06"]
+def test_ladder_is_complete():
+    assert len(ATTACKS) == 11
+    assert IDS == ["A01", "A02", "A03", "A04", "A05", "A06",
+                   "A07", "A08", "A09", "A10", "A11"]
+    assert len(set(IDS)) == len(IDS)  # ids are unique

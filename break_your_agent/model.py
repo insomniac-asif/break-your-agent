@@ -114,10 +114,11 @@ class OllamaModel:
     ]
 
     def __init__(self, model: str = "llama3.2:3b", host: str = "http://localhost:11434",
-                 temperature: float = 0.0):
+                 temperature: float = 0.0, keep_alive: str = "8m"):
         self.model = model
         self.host = host.rstrip("/")
         self.temperature = temperature
+        self.keep_alive = keep_alive
 
     def _to_ollama(self, messages: List[dict]) -> List[dict]:
         """Translate the agent's message log into Ollama's native chat format."""
@@ -148,6 +149,7 @@ class OllamaModel:
             "messages": self._to_ollama(messages),
             "tools": self.TOOLS,
             "stream": False,
+            "keep_alive": self.keep_alive,   # keep the model warm across a scorecard's many calls
             "options": {"temperature": self.temperature},
         }).encode()
         req = urllib.request.Request(

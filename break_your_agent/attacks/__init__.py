@@ -18,6 +18,11 @@ from . import (
     a04_confused_deputy,
     a05_data_exfiltration,
     a06_unicode_smuggling,
+    a07_goal_hijack_exfil,
+    a08_refusal_suppression,
+    a09_authority_spoof,
+    a10_multihop_indirect,
+    a11_persistence_bestofn,
 )
 
 ATTACKS = [
@@ -27,6 +32,11 @@ ATTACKS = [
     a04_confused_deputy.ATTACK,
     a05_data_exfiltration.ATTACK,
     a06_unicode_smuggling.ATTACK,
+    a07_goal_hijack_exfil.ATTACK,
+    a08_refusal_suppression.ATTACK,
+    a09_authority_spoof.ATTACK,
+    a10_multihop_indirect.ATTACK,
+    a11_persistence_bestofn.ATTACK,
 ]
 
 __all__ = ["Attack", "run_attack", "ATTACKS"]
