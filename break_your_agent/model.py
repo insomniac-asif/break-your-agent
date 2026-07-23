@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from ._text import normalize_fullwidth, parse_directives
+from ._text import extract_toolcall_from_text, normalize_fullwidth, parse_directives
 
 # Placeholder the model resolves to the most recently read note. Lets an
 # attacker script a two-step "read secret, then leak it" chain.
@@ -114,11 +114,19 @@ class OllamaModel:
     ]
 
     def __init__(self, model: str = "llama3.2:3b", host: str = "http://localhost:11434",
-                 temperature: float = 0.0, keep_alive: str = "8m"):
+                 temperature: float = 0.0, keep_alive: str = "8m",
+                 think: Optional[bool] = False):
         self.model = model
         self.host = host.rstrip("/")
         self.temperature = temperature
         self.keep_alive = keep_alive
+        # Reasoning models (qwen3, deepseek-r1, ...) otherwise spend the turn
+        # emitting <think> tokens and often return no tool call — a false "safe".
+        # API-level think=False disables that (a prompt tag like /no_think does
+        # NOT work — the model ignores it). None omits the field for old servers.
+        self.think = think
+        # Names of the tools we actually expose, for validating a rescued call.
+        self._tool_names = {t["function"]["name"] for t in self.TOOLS}
 
     def _to_ollama(self, messages: List[dict]) -> List[dict]:
         """Translate the agent's message log into Ollama's native chat format."""
@@ -144,14 +152,17 @@ class OllamaModel:
         import json
         import urllib.request
 
-        payload = json.dumps({
+        body: Dict[str, Any] = {
             "model": self.model,
             "messages": self._to_ollama(messages),
             "tools": self.TOOLS,
             "stream": False,
             "keep_alive": self.keep_alive,   # keep the model warm across a scorecard's many calls
             "options": {"temperature": self.temperature},
-        }).encode()
+        }
+        if self.think is not None:
+            body["think"] = self.think
+        payload = json.dumps(body).encode()
         req = urllib.request.Request(
             f"{self.host}/api/chat", data=payload, headers={"Content-Type": "application/json"}
         )
@@ -169,4 +180,16 @@ class OllamaModel:
                     args = {}
             args = {k: str(v) for k, v in args.items()}
             return ModelResponse(tool_call=ToolCallRequest(name=fn.get("name", ""), args=args))
-        return ModelResponse(final=(msg.get("content", "") or "done.").strip())
+
+        # No native tool_calls: a real model may have emitted the call as text or
+        # markup (Hermes tag, fenced JSON, XML, bare JSON). Salvage it so a model
+        # that DID fall for the attack isn't miscounted as safe. Validate the name
+        # against our real tool set so ordinary prose/JSON isn't treated as a call.
+        content = msg.get("content", "") or ""
+        rescued = extract_toolcall_from_text(content)
+        if rescued is not None and rescued[0] in self._tool_names:
+            name, args = rescued
+            return ModelResponse(
+                tool_call=ToolCallRequest(name=name, args={k: str(v) for k, v in args.items()})
+            )
+        return ModelResponse(final=(content or "done.").strip())
